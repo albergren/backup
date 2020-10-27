@@ -4,6 +4,7 @@
 
 backup_created=false
 backup_destination=""
+identifier_name=".backup_dir"
 
 function create_archive () {
     time=`date +%b-%d-%y`
@@ -34,7 +35,8 @@ function mount_drives () {
 function find_backup_location() {
     mount_point=/media/`whoami`
     for i in $mount_point/* ; do
-	if [ -f $i/.backup_dest ] ; then
+	echo $identifier_name
+	if [ -f $i/$identifier_name ] ; then
 	    echo "success"
 	    backup_destination=$i/
 	    return 1;
@@ -49,10 +51,10 @@ function remove_oldest_backup () {
 	}
 
 # If first run then initialize
-if  [ ! -f .backup_dest ] ; then
+if  [ ! -f $identifier_name ] ; then
     read -p "Enter path to location of backup on drive: " destination
-    touch $destination/.backup_dest    
-    touch .backup_dest
+    touch $destination/$identifier_name    
+    touch $identifier_name
     
 else   
     # find mountpont for drive and create archive. 
