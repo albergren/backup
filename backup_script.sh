@@ -2,14 +2,14 @@
 
 . backup.conf
 
-backup_created=false
 backup_destination=""
 identifier_name=".backup_identifier"
+mounted_drives=""
 
 function create_archive () {
     time=`date +%G%m%d%H%M`
     filename=backup-$time.tar.gz 
-    src_dirs=''
+    src_dirs=""
 
     for i in "${dir_paths[@]}"; do
     
@@ -18,19 +18,31 @@ function create_archive () {
    
 	src_dirs="$src_dirs -C  $dir_path $dir_name" 
     done
-
+    
+    echo "Creating archive..."
     tar -cpvzf $1$filename $src_dirs
-    backup_created=true 
+    echo "Archive created!"
+
 
 }
 
 
 function mount_drives () {
+    echo "Mounting connected drives..."
     for i in /dev/sd[b-e][1-9]; do
-	echo "Mounting connected drives..."
-	udisksctl mount -b $i  
+	udisksctl mount -b $i 2> /dev/null
+	if [ $? -eq 0 ] ; then
+	    mounted_drives="$mounted_drives $i"
+       	fi
+
     done
-    sleep 5
+}
+
+function unmount_drives () {
+    for i in $mounted_drives; do
+	echo "Unmounting drives..."
+	udisksctl unmount -b $i  
+    done
 }
 
 function find_backup_location() {
@@ -42,17 +54,26 @@ function find_backup_location() {
 	    return 1;
 	fi
     done
-    echo "Backup drive could not be found. Make sure drive is connected!"
     return 0;
 
 }
 function remove_oldest_backup () {
-    backup_count=$(find $1backup-*.tar.gz | sort | wc -l)
+    backup_count=$(find $1backup-*.tar.gz 2> /dev/null | wc -l)
     if (( $backup_count > $store_count ))  ; then
 	oldest_backup=`find $1backup-*.tar.gz | sort | head -n1`
 	rm $oldest_backup
     fi
 }
+
+function check_backup_exists (){
+    backup_today_count=$(find $1backup-`date +%G%m%d`*.tar.gz 2> /dev/null | wc -l)
+    if (( $backup_today_count > 0 ))  ; then
+	echo "Backup already exists!"
+	unmount_drives
+	exit 1
+    fi
+}
+
 
 # If first run then initialize
 if  [ ! -f $identifier_name ] ; then
@@ -65,9 +86,8 @@ else
     find_backup_location
     
     if [ "$backup_destination"  ] ; then
-	echo "Creating archive..."
+	check_backup_exists $backup_destination
 	create_archive $backup_destination
-	echo "Archive created!"
 	remove_oldest_backup  $backup_destination
 	exit 1
     fi
@@ -76,10 +96,11 @@ else
     find_backup_location
     
     if [ "$backup_destination"  ] ; then
-	echo "Creating archive..."
+	check_backup_exists $backup_destination
 	create_archive $backup_destination
-	echo "Archive created!"
 	remove_oldest_backup $backup_destination
+	unmount_drives
 	exit 1
     fi
+    unmount_drives
 fi
