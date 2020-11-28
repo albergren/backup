@@ -1,7 +1,8 @@
 #!/bin/bash
+ 
 
-. backup.conf
-
+conf_path="$(dirname "$0")/backup.conf"
+. $conf_path
 backup_destination=""
 identifier_name=".backup_identifier"
 mounted_drives=""
@@ -34,9 +35,9 @@ function mount_drives () {
 	if [ $? -eq 0 ] ; then
 	    mounted_drives="$mounted_drives $i"
        	fi
-
     done
 }
+
 
 function unmount_drives () {
     for i in $mounted_drives; do
@@ -45,18 +46,20 @@ function unmount_drives () {
     done
 }
 
+
 function find_backup_location() {
     mount_point=/media/`whoami`
     for i in $mount_point/* ; do
 	if [ -f $i/$identifier_name ] ; then
-	    echo "Backup drive found!"
 	    backup_destination=$i/
-	    return 1;
+	    return 0;
 	fi
     done
-    return 0;
+    return 1;
 
 }
+
+
 function remove_oldest_backup () {
     backup_count=$(find $1backup-*.tar.gz 2> /dev/null | wc -l)
     if (( $backup_count > $store_count ))  ; then
@@ -65,12 +68,13 @@ function remove_oldest_backup () {
     fi
 }
 
+
 function check_backup_exists (){
     backup_today_count=$(find $1backup-`date +%G%m%d`*.tar.gz 2> /dev/null | wc -l)
     if (( $backup_today_count > 0 ))  ; then
 	echo "Backup already exists!"
 	unmount_drives
-	exit 1
+	exit 0
     fi
 }
 
@@ -80,7 +84,7 @@ if  [ ! -f $identifier_name ] ; then
     read -p "Enter path to drive where backups will be stored: " destination
     touch $destination/$identifier_name    
     touch $identifier_name
-    
+
 else   
     # find mountpont for drive and create archive. 
     find_backup_location
@@ -89,9 +93,9 @@ else
 	check_backup_exists $backup_destination
 	create_archive $backup_destination
 	remove_oldest_backup  $backup_destination
-	exit 1
+	exit 0
     fi
-    # If not found mount drives and try again.
+    # If not found, mount drives and try again.
     mount_drives
     find_backup_location
     
@@ -100,7 +104,7 @@ else
 	create_archive $backup_destination
 	remove_oldest_backup $backup_destination
 	unmount_drives
-	exit 1
+	exit 0
     fi
     unmount_drives
 fi
